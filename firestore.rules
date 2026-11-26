@@ -1,0 +1,163 @@
+rules_version = '2';
+
+// QR Studio — règles Firestore de production.
+//
+// Modèle : chaque document appartient à un seul utilisateur (`ownerId`).
+// - Le client ne peut lire/écrire que ses propres QR codes.
+// - Les compteurs (totalScans, uniqueVisitors, lastScanAt) ne sont jamais
+//   modifiables par le client : seule la fonction Netlify (Admin SDK, qui
+//   contourne ces règles) les incrémente.
+// - Les analytiques (days, scans, visitors) sont lisibles par le propriétaire,
+//   créées uniquement par le serveur ; le propriétaire peut les supprimer pour
+//   la suppression en cascade de son QR code.
+// - La table `slugs` (utilisée par la redirection) n'est jamais lisible depuis
+//   le navigateur.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(data) {
+      return signedIn() && data.ownerId == request.auth.uid;
+    }
+
+    function validQrType(value) {
+      return value in ['url', 'instagram', 'facebook', 'whatsapp', 'youtube', 'text'];
+    }
+
+    function validQrName(value) {
+      return value is string && value.size() > 0 && value.size() <= 120;
+    }
+
+    // A "text" QR stores the text itself; every other type must be a real
+    // http(s) URL, so a stored destination can never become a javascript: or
+    // data: redirect served from the QR Studio domain.
+    function validDestination(type, value) {
+      return value is string
+        && value.size() > 0
+        && value.size() <= 2048
+        && (type == 'text' || value.matches('^https?://.+'));
+    }
+
+    // ---------------------------------------------------------------- users
+    match /users/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['email', 'displayName', 'createdAt'])
+        && request.resource.data.email is string
+        && request.resource.data.email.size() <= 254
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() <= 120;
+
+      // Only the display name is editable; email and creation date are fixed.
+      allow update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['displayName', 'updatedAt'])
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() <= 120;
+
+      allow delete: if false;
+    }
+
+    // -------------------------------------------------------------- qrcodes
+    match /qrcodes/{qrId} {
+      allow read: if isOwner(resource.data);
+
+      // Counters start at zero and can never be written by a client. The slug
+      // is chosen at creation and then immutable, so a printed QR code keeps
+      // working even when the destination is edited later.
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly([
+             'active', 'createdAt', 'destination', 'lastScanAt', 'name',
+             'ownerId', 'slug', 'totalScans', 'type', 'uniqueVisitors', 'updatedAt'
+           ])
+        && request.resource.data.ownerId == request.auth.uid
+        && validQrName(request.resource.data.name)
+        && validQrType(request.resource.data.type)
+        && validDestination(request.resource.data.type, request.resource.data.destination)
+        && request.resource.data.slug is string
+        && request.resource.data.slug.matches('^[a-z0-9]{8,24}$')
+        && request.resource.data.totalScans == 0
+        && request.resource.data.uniqueVisitors == 0
+        && request.resource.data.lastScanAt == null
+        && request.resource.data.active == true;
+
+      allow update: if isOwner(resource.data)
+        && request.resource.data.ownerId == resource.data.ownerId
+        && request.resource.data.slug == resource.data.slug
+        && request.resource.data.totalScans == resource.data.totalScans
+        && request.resource.data.uniqueVisitors == resource.data.uniqueVisitors
+        && request.resource.data.lastScanAt == resource.data.lastScanAt
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['name', 'destination', 'type', 'updatedAt', 'active'])
+        && validQrName(request.resource.data.name)
+        && validQrType(request.resource.data.type)
+        && validDestination(request.resource.data.type, request.resource.data.destination);
+
+      allow delete: if isOwner(resource.data);
+
+      // Analytics: readable by the owner, written only by the scan function.
+      // The owner may delete them, which is how deleting a QR code cleans up.
+      match /days/{day} {
+        allow read: if isOwner(resource.data);
+        allow delete: if isOwner(resource.data);
+        allow create, update: if false;
+      }
+      match /scans/{scan} {
+        allow read: if isOwner(resource.data);
+        allow delete: if isOwner(resource.data);
+        allow create, update: if false;
+      }
+      match /visitors/{visitor} {
+        allow read: if isOwner(resource.data);
+        allow delete: if isOwner(resource.data);
+        allow create, update: if false;
+      }
+    }
+
+    // ---------------------------------------------------------------- slugs
+    // Public lookup table used by the redirect function. Never readable from
+    // the browser: the short link is stored on the QR document instead.
+    // Creation is only accepted when the QR document written in the same
+    // transaction belongs to the caller, so a user cannot point a short link at
+    // someone else's QR code.
+    match /slugs/{slug} {
+      allow read: if false;
+
+      allow create: if signedIn()
+        && slug.matches('^[a-z0-9]{8,24}$')
+        && request.resource.data.keys().hasOnly(['qrId', 'ownerId', 'createdAt'])
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.qrId is string
+        && getAfter(
+             /databases/$(database)/documents/qrcodes/$(request.resource.data.qrId)
+           ).data.ownerId == request.auth.uid;
+
+      allow delete: if isOwner(resource.data);
+      allow update: if false;
+    }
+
+    // ------------------------------------------- collection group queries
+    // Needed for the dashboard (all scans / daily counters of one owner).
+    match /{path=**}/days/{day} {
+      allow read: if isOwner(resource.data);
+      allow write: if false;
+    }
+    match /{path=**}/scans/{scan} {
+      allow read: if isOwner(resource.data);
+      allow write: if false;
+    }
+    match /{path=**}/visitors/{visitor} {
+      allow read, write: if false;
+    }
+
+    // Nothing else is readable or writable.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

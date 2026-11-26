@@ -1,0 +1,52 @@
+# Netlify configuration for QR Studio
+# Deployed site: the React app is built to `dist`, the scan endpoint lives in
+# `netlify/functions`. `/r/:slug` is rewritten to the function, everything else
+# falls back to the SPA.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Netlify packages the function with its default Node File Tracing bundler, which
+# ships firebase-admin and its dependencies inside the function bundle.
+# (Do not switch to node_bundler = "esbuild": firebase-admin relies on dynamic
+# require calls that break inside a single ESM bundle.)
+[functions]
+  included_files = []
+
+[dev]
+  command = "npm run dev"
+  targetPort = 5173
+  port = 8888
+  autoLaunch = false
+
+# 1. Scan + redirect endpoint. Must stay above the SPA fallback.
+[[redirects]]
+  from = "/r/*"
+  to = "/.netlify/functions/r"
+  status = 200
+  force = true
+
+# 2. Client-side routes (React Router).
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "SAMEORIGIN"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "geolocation=(), microphone=(), camera=()"
+
+# Never cache the scan endpoint: every hit must reach the function.
+[[headers]]
+  for = "/.netlify/functions/r"
+  [headers.values]
+    Cache-Control = "no-store"
