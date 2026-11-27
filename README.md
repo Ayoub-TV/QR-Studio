@@ -149,4 +149,3 @@ fonctionne tant que l'ancien domaine reste actif.
 npm run typecheck     # TypeScript strict
 npm run build         # tsc + vite build
 ```
-# QR-Studio
