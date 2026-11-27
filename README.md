@@ -124,8 +124,10 @@ npx netlify-cli init            # lier le dossier au site
 npx netlify-cli deploy --build --prod
 ```
 
-Ou connectez le dépôt Git à Netlify : `netlify.toml` déclare déjà
-`command = "npm run build"`, `publish = "dist"`, `functions = "netlify/functions"`.
+Ou connectez le dépôt Git à Netlify : `netlify.toml` utilise Node.js 22 et
+installe les dépendances du fichier de verrouillage, y compris TypeScript et
+Vite, avant de compiler. Le site est publié depuis `dist` et les fonctions
+depuis `netlify/functions`.
 
 ### 3. Domaine
 
