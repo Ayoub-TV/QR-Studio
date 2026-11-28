@@ -1,4 +1,5 @@
 import type { Timestamp } from 'firebase/firestore';
+import type { QrDesign } from './qr';
 
 export type QrType = 'url' | 'instagram' | 'facebook' | 'whatsapp' | 'youtube' | 'text';
 
@@ -15,6 +16,8 @@ export interface QrCode {
   uniqueVisitors: number;
   lastScanAt: Timestamp | null;
   active: boolean;
+  /** Optional: codes created before customisation existed have no design. */
+  design?: QrDesign | null;
 }
 
 export interface ScanEvent {

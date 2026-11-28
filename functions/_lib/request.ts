@@ -4,36 +4,35 @@ export interface GeoInfo {
   region?: string | null;
 }
 
-interface NetlifyGeo {
+/** Subset of Cloudflare's `request.cf` object that we use. */
+export interface CfProperties {
   city?: string;
-  country?: { code?: string; name?: string };
-  subdivision?: { code?: string; name?: string };
+  country?: string;
+  region?: string;
+  regionCode?: string;
 }
 
-function decodeNetlifyGeo(header: string | null): NetlifyGeo | null {
-  if (!header) return null;
-  try {
-    const json = Buffer.from(header, 'base64').toString('utf8');
-    return JSON.parse(json) as NetlifyGeo;
-  } catch {
-    return null;
-  }
+/**
+ * Cloudflare exposes the visitor location on `request.cf`, and the country on
+ * the `cf-ipcountry` header. Values are already ISO/plain strings, unlike the
+ * base64 `x-nf-geo` header Netlify used.
+ */
+export function readGeo(headers: Headers, cf?: CfProperties | null): GeoInfo | null {
+  const country = cf?.country || headers.get('cf-ipcountry') || null;
+  const region = cf?.region || cf?.regionCode || headers.get('cf-region') || null;
+  const city = cf?.city || headers.get('cf-ipcity') || null;
+
+  if (!country && !region && !city) return null;
+  return { city: city || null, country: country || null, region: region || null };
 }
 
-export function readGeo(headers: Headers, contextGeo?: unknown): GeoInfo | null {
-  const fromContext = contextGeo as NetlifyGeo | undefined;
-  const geo = fromContext ?? decodeNetlifyGeo(headers.get('x-nf-geo'));
-  if (!geo) return null;
-  return {
-    city: geo.city ?? null,
-    country: geo.country?.code ?? geo.country?.name ?? null,
-    region: geo.subdivision?.name ?? geo.subdivision?.code ?? null,
-  };
-}
-
-export function readIp(headers: Headers, contextIp?: string): string {
-  const forwarded = headers.get('x-forwarded-for') ?? headers.get('x-nf-client-connection-ip');
-  const candidate = contextIp || forwarded?.split(',')[0]?.trim() || headers.get('client-ip') || '';
+export function readIp(headers: Headers, contextIp?: string | null): string {
+  const candidate =
+    contextIp ||
+    headers.get('cf-connecting-ip') ||
+    headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    headers.get('x-real-ip') ||
+    '';
   return candidate;
 }
 

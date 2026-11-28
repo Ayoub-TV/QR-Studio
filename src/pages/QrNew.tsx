@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { Alert, Spinner } from '../components/ui';
 import { Icon, TypeIcon } from '../components/Icons';
 import { QrImage } from '../components/QrImage';
+import { QrDesigner } from '../components/QrDesigner';
 import {
   buildDestination,
   QR_TYPES,
@@ -12,6 +13,7 @@ import {
   validateName,
 } from '../lib/destinations';
 import { createQrCode, generateSlug, shortUrl } from '../lib/qrcodes';
+import { DEFAULT_DESIGN, type QrDesign } from '../lib/qr';
 import type { QrType } from '../lib/types';
 
 export default function QrNew() {
@@ -20,6 +22,7 @@ export default function QrNew() {
   const [type, setType] = useState<QrType>('url');
   const [name, setName] = useState('');
   const [value, setValue] = useState('');
+  const [design, setDesign] = useState<QrDesign>(DEFAULT_DESIGN);
   const [errors, setErrors] = useState<{ name?: string; destination?: string }>({});
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -49,6 +52,7 @@ export default function QrNew() {
           name,
           type,
           destination: buildDestination(type, value),
+          design,
         },
         suggestedSlug,
       );
@@ -180,6 +184,14 @@ export default function QrNew() {
             </div>
           )}
 
+          <div className="mt-6">
+            <span className="label">Personnaliser le design du QR code</span>
+            <p className="hint mt-1.5 mb-3">
+              Couleurs, forme des modules, coins et logo. Le lien imprimé ne change jamais.
+            </p>
+            <QrDesigner text={shortUrl(suggestedSlug)} value={design} onChange={setDesign} compact />
+          </div>
+
           <div className="mt-7 flex flex-wrap items-center gap-3">
             <button type="submit" className="btn btn-primary" disabled={submitting}>
               {submitting ? <Spinner /> : <Icon name="qr" size={16} />}
@@ -197,7 +209,7 @@ export default function QrNew() {
               <p className="text-[13px] font-medium">Aperçu</p>
             </div>
             <div className="flex flex-col items-center px-5 py-7">
-              <QrImage value={shortUrl(suggestedSlug)} size={208} alt="Aperçu du QR code" />
+              <QrImage value={shortUrl(suggestedSlug)} size={208} alt="Aperçu du QR code" design={design} />
               <p className="mt-5 max-w-full truncate rounded-md border border-line bg-zinc-50 px-2.5 py-1 font-mono text-[11px] text-zinc-500">
                 {shortUrl(suggestedSlug)}
               </p>

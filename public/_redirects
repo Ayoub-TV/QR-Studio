@@ -1,0 +1,20 @@
+# Cloudflare Pages — routage de l'application React (React Router).
+#
+# Un catch-all `/*  /index.html  200` est refusé par Cloudflare (« infinite
+# loop detected ») et ignoré, donc les routes côté client sont déclarées ici.
+# Les routes imbriquées (/app/qrcodes/:id, /app/new, /app/settings) sont
+# couvertes par le joker `/app/*`.
+#
+# Note : une réécriture vers `/index.html` sur un chemin exact est suivie par
+# Pages d'une normalisation qui redirige (308) vers `/`, ce qui casse l'accès
+# direct à /login ou /app. On réécrit donc vers `/` (racine servie en 200) pour
+# les chemins exacts, et vers `/index.html` uniquement via un joker, qui n'est
+# pas normalisé.
+# `/r/*` n'apparaît pas : il est servi par la Pages Function
+# `functions/r/[[slug]].ts`, et les règles `_redirects` ne s'appliquent jamais
+# aux routes des Functions.
+/app              /               200
+/app/*            /index.html     200
+/login            /               200
+/signup           /               200
+/forgot-password  /               200

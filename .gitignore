@@ -9,3 +9,9 @@ dist-ssr
 *.log
 .netlify
 .tools
+.dev.vars
+.wrangler
+
+# Outils locaux (hors depot)
+.cloud-attachments
+.freebuff

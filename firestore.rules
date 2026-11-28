@@ -5,8 +5,8 @@ rules_version = '2';
 // Modèle : chaque document appartient à un seul utilisateur (`ownerId`).
 // - Le client ne peut lire/écrire que ses propres QR codes.
 // - Les compteurs (totalScans, uniqueVisitors, lastScanAt) ne sont jamais
-//   modifiables par le client : seule la fonction Netlify (Admin SDK, qui
-//   contourne ces règles) les incrémente.
+//   modifiables par le client : seule la fonction Cloudflare Pages (compte de
+//   service, qui contourne ces règles) les incrémente.
 // - Les analytiques (days, scans, visitors) sont lisibles par le propriétaire,
 //   créées uniquement par le serveur ; le propriétaire peut les supprimer pour
 //   la suppression en cascade de son QR code.

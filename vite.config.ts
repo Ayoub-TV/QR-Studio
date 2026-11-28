@@ -1,12 +1,14 @@
 import { defineConfig, loadEnv, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
+import { handleScan } from './functions/_lib/handler.ts';
 
 /**
- * Netlify serves `/r/:slug` through the `r` function (see netlify.toml).
- * During `vite dev` there is no Netlify runtime, so this middleware forwards
- * the exact same requests to the exact same handler. Production code is
- * untouched: the function reads the slug from the request path in both cases.
+ * Cloudflare Pages serves `/r/:slug` through the Pages Function in
+ * `functions/r/[[slug]].ts`. During `vite dev` there is no Workers runtime, so
+ * this middleware forwards the exact same requests to the exact same handler.
+ * Production code is untouched: the function reads the slug from the request
+ * path in both cases.
  */
 function scanRedirectPlugin(): Plugin {
   return {
@@ -25,7 +27,6 @@ function scanRedirectPlugin(): Plugin {
 
         void (async () => {
           try {
-            const mod = await server.ssrLoadModule('/netlify/functions/r.ts');
             const headers = new Headers();
             for (const [key, value] of Object.entries(req.headers)) {
               if (typeof value === 'string') headers.set(key, value);
@@ -35,9 +36,10 @@ function scanRedirectPlugin(): Plugin {
               method: req.method ?? 'GET',
               headers,
             });
-            const response: Response = await mod.default(request, {
+            const response = await handleScan(request, {
+              env: process.env as Record<string, string | undefined>,
               ip: req.socket.remoteAddress,
-              geo: undefined,
+              cf: null,
             });
             res.statusCode = response.status;
             response.headers.forEach((value, key) => res.setHeader(key, value));

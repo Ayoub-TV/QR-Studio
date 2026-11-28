@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Route, Routes, useLocation } from 'react-router-dom';
 import { isFirebaseConfigured } from './lib/firebase';
+import { trackPageView } from './lib/analytics';
 import AppLayout from './components/AppLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import Dashboard from './pages/Dashboard';
@@ -14,6 +15,14 @@ import QrNew from './pages/QrNew';
 import Settings from './pages/Settings';
 import SetupNotice from './pages/SetupNotice';
 import Signup from './pages/Signup';
+
+function AnalyticsTracker() {
+  const { pathname, search } = useLocation();
+  useEffect(() => {
+    trackPageView(`${pathname}${search}`);
+  }, [pathname, search]);
+  return null;
+}
 
 function ScrollToTop() {
   const { pathname, hash } = useLocation();
@@ -35,6 +44,7 @@ export default function App() {
 
   return (
     <>
+      <AnalyticsTracker />
       <ScrollToTop />
       <Routes>
         <Route path="/" element={<Landing />} />

@@ -273,7 +273,7 @@ export default function Settings() {
             </p>
           </div>
           <p className="hint mt-3">
-            Pour un domaine personnalisé, configurez-le dans Netlify : les QR codes déjà imprimés
+            Pour un domaine personnalisé, configurez-le dans Cloudflare Pages : les QR codes déjà imprimés
             continueront de fonctionner si le domaine reste actif.
           </p>
         </div>

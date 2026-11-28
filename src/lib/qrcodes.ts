@@ -15,6 +15,7 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore';
 import { getFirebase } from './firebase';
+import { DEFAULT_DESIGN, normalizeDesign, type QrDesign } from './qr';
 import type { DayStat, QrCode, QrType, ScanEvent } from './types';
 
 const SLUG_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';
@@ -36,6 +37,7 @@ export interface CreateQrInput {
   name: string;
   type: QrType;
   destination: string;
+  design?: QrDesign;
 }
 
 /**
@@ -65,6 +67,7 @@ export async function createQrCode(input: CreateQrInput, preferredSlug?: string)
           uniqueVisitors: 0,
           lastScanAt: null,
           active: true,
+          design: normalizeDesign(input.design ?? DEFAULT_DESIGN),
         });
         tx.set(slugRef, {
           qrId: qrRef.id,
@@ -90,6 +93,28 @@ export async function updateQrCode(
     name: patch.name.trim(),
     destination: patch.destination,
     type: patch.type,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/**
+ * Turns the short link on or off. A disabled QR code answers with a
+ * "QR code désactivé" page and no longer records scans, while the printed code
+ * keeps the same URL and can be re-enabled at any time.
+ */
+export async function setQrActive(id: string, active: boolean): Promise<void> {
+  const { db } = getFirebase();
+  await updateDoc(doc(db, 'qrcodes', id), { active, updatedAt: serverTimestamp() });
+}
+
+/**
+ * Saves the visual design. The printed code never changes: only how the same
+ * short link is drawn in the app and in the exported files.
+ */
+export async function updateQrDesign(id: string, design: QrDesign): Promise<void> {
+  const { db } = getFirebase();
+  await updateDoc(doc(db, 'qrcodes', id), {
+    design: normalizeDesign(design),
     updatedAt: serverTimestamp(),
   });
 }

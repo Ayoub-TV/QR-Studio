@@ -10,11 +10,11 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "emulators": "firebase emulators:start --only auth,firestore --project qr-studio-dev",
-    "deploy": "netlify deploy --build --prod"
+    "pages:dev": "npm run build && wrangler pages dev dist",
+    "deploy": "npm run build && wrangler pages deploy dist"
   },
   "dependencies": {
     "firebase": "^12.4.0",
-    "firebase-admin": "^13.5.0",
     "qrcode": "^1.5.4",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
@@ -29,9 +29,9 @@
     "@types/react-dom": "^19.1.9",
     "@vitejs/plugin-react": "^5.0.4",
     "firebase-tools": "^14.19.0",
-    "netlify-cli": "^27.20.1",
     "tailwindcss": "^4.1.14",
     "typescript": "^5.9.3",
-    "vite": "^7.1.9"
+    "vite": "^7.1.9",
+    "wrangler": "^4.168.0"
   }
 }

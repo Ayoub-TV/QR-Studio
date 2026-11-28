@@ -63,7 +63,7 @@ const FAQ = [
   },
   {
     q: 'Comment les scans sont-ils comptabilisés ?',
-    a: 'Chaque visite de /r/:slug passe par une fonction Netlify qui identifie le QR code, incrémente les compteurs dans une transaction Firestore, enregistre le détail du scan, puis redirige immédiatement le visiteur.',
+    a: 'Chaque visite de /r/:slug passe par une fonction Cloudflare Pages qui identifie le QR code, incrémente les compteurs dans une transaction Firestore, enregistre le détail du scan, puis redirige immédiatement le visiteur.',
   },
   {
     q: 'Comment sont estimés les visiteurs uniques ?',
@@ -71,7 +71,7 @@ const FAQ = [
   },
   {
     q: 'Où sont hébergés mon application et mes données ?',
-    a: 'Le frontend et la fonction de redirection sont hébergés sur Netlify ; l’authentification et la base de données sont gérées par Firebase. Les clés serveur restent dans les variables d’environnement Netlify.',
+    a: 'Le frontend et la fonction de redirection sont hébergés sur Cloudflare Pages ; l’authentification et la base de données sont gérées par Firebase. Les clés serveur restent dans les variables d’environnement Cloudflare Pages.',
   },
 ];
 
@@ -385,7 +385,7 @@ export default function Landing() {
           <div className="flex items-center gap-2.5">
             <Logo size={22} />
           </div>
-          <p>© {new Date().getFullYear()} QR Studio · Frontend Netlify · Données Firebase</p>
+          <p>© {new Date().getFullYear()} QR Studio · Frontend Cloudflare Pages · Données Firebase</p>
           <div className="flex gap-5">
             {user ? (
               <Link to="/app" className="hover:text-ink">

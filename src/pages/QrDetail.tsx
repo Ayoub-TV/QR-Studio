@@ -4,8 +4,9 @@ import { useAuth } from '../auth/AuthProvider';
 import { useChartSeries, useQrDetail } from '../hooks/useData';
 import { formatDate, formatDateTime, formatNumber, relativeTime } from '../lib/format';
 import { buildDestination, displayDestination, qrTypeMeta, validateDestination, validateName } from '../lib/destinations';
-import { updateQrCode, deleteQrCode, shortUrl } from '../lib/qrcodes';
-import { downloadQrPng, downloadQrSvg } from '../lib/qr';
+import { updateQrCode, deleteQrCode, setQrActive, shortUrl, updateQrDesign } from '../lib/qrcodes';
+import { downloadQrPng, downloadQrSvg, DEFAULT_DESIGN, normalizeDesign, type QrDesign } from '../lib/qr';
+import { QrDesigner } from '../components/QrDesigner';
 import { copyText } from '../lib/clipboard';
 import { Alert, EmptyState, Modal, PageLoader, Spinner } from '../components/ui';
 import { Icon, TypeIcon } from '../components/Icons';
@@ -25,17 +26,25 @@ export default function QrDetail() {
   const [value, setValue] = useState('');
   const [errors, setErrors] = useState<{ name?: string; destination?: string }>({});
   const [saving, setSaving] = useState(false);
+  const [savingActive, setSavingActive] = useState(false);
   const [notice, setNotice] = useState<{ variant: 'success' | 'error'; text: string } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [downloading, setDownloading] = useState<'png' | 'svg' | null>(null);
   const [copied, setCopied] = useState(false);
+  const [designDraft, setDesignDraft] = useState<QrDesign>(DEFAULT_DESIGN);
+  const [savingDesign, setSavingDesign] = useState(false);
+  const [designNotice, setDesignNotice] = useState<{ variant: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     if (qr && user && qr.ownerId !== user.uid) {
       navigate('/app/qrcodes', { replace: true });
     }
   }, [qr, user, navigate]);
+
+  useEffect(() => {
+    if (qr) setDesignDraft(normalizeDesign(qr.design));
+  }, [qr?.design]);
 
   const startEdit = () => {
     if (!qr) return;
@@ -73,6 +82,26 @@ export default function QrDetail() {
     }
   };
 
+  const handleToggleActive = async () => {
+    if (!qr) return;
+    const nextActive = qr.active === false;
+    setSavingActive(true);
+    setNotice(null);
+    try {
+      await setQrActive(qr.id, nextActive);
+      setNotice({
+        variant: 'success',
+        text: nextActive
+          ? 'QR code réactivé : le lien redirige à nouveau et les scans sont comptés.'
+          : 'QR code désactivé : le lien affiche une page « QR code désactivé » et ne compte plus les scans. Vous pouvez le réactiver à tout moment.',
+      });
+    } catch (err) {
+      setNotice({ variant: 'error', text: (err as Error).message });
+    } finally {
+      setSavingActive(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!qr) return;
     setDeleting(true);
@@ -91,12 +120,30 @@ export default function QrDetail() {
     setDownloading(format);
     try {
       const url = shortUrl(qr.slug);
-      if (format === 'png') await downloadQrPng(url, qr.name);
-      else await downloadQrSvg(url, qr.name);
+      const design = normalizeDesign(qr.design);
+      if (format === 'png') await downloadQrPng(url, qr.name, design);
+      else await downloadQrSvg(url, qr.name, design);
     } catch (err) {
       setNotice({ variant: 'error', text: `Téléchargement impossible : ${(err as Error).message}` });
     } finally {
       setDownloading(null);
+    }
+  };
+
+  const handleSaveDesign = async () => {
+    if (!qr) return;
+    setSavingDesign(true);
+    setDesignNotice(null);
+    try {
+      await updateQrDesign(qr.id, designDraft);
+      setDesignNotice({
+        variant: 'success',
+        text: 'Design enregistré. Le QR code déjà imprimé reste valable : seul son apparence change.',
+      });
+    } catch (err) {
+      setDesignNotice({ variant: 'error', text: (err as Error).message });
+    } finally {
+      setSavingDesign(false);
     }
   };
 
@@ -152,7 +199,11 @@ export default function QrDetail() {
               </span>
               <span className="text-zinc-300">·</span>
               <span className="inline-flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    qr.active === false ? 'bg-zinc-300' : 'bg-emerald-500'
+                  }`}
+                />
                 {qr.active === false ? 'Désactivé' : 'Actif'}
               </span>
               <span className="text-zinc-300">·</span>
@@ -169,6 +220,15 @@ export default function QrDetail() {
               <Icon name="external" size={15} />
               Tester le lien
             </a>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={handleToggleActive}
+              disabled={savingActive}
+            >
+              {savingActive ? <Spinner /> : <Icon name={qr.active === false ? 'check' : 'shield'} size={15} />}
+              {qr.active === false ? 'Réactiver' : 'Désactiver'}
+            </button>
             <button type="button" className="btn btn-danger" onClick={() => setConfirmDelete(true)}>
               <Icon name="trash" size={15} />
               Supprimer
@@ -187,7 +247,13 @@ export default function QrDetail() {
       <div className="grid gap-4 lg:grid-cols-[320px_1fr] lg:items-start">
         <div className="card p-5">
           <div className="flex justify-center rounded-xl border border-line bg-zinc-50/60 p-5">
-            <QrImage value={url} size={230} alt={`QR code ${qr.name}`} className="shadow-sm" />
+            <QrImage
+              value={url}
+              size={230}
+              alt={`QR code ${qr.name}`}
+              className="shadow-sm"
+              design={normalizeDesign(qr.design)}
+            />
           </div>
 
           <div className="mt-4">
@@ -352,6 +418,38 @@ export default function QrDetail() {
               </div>
             )}
           </div>
+        </div>
+      </div>
+
+      <div className="card p-5 sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-[15px] font-semibold tracking-[-0.01em]">Design du QR code</h2>
+            <p className="mt-0.5 text-[13px] text-zinc-500">
+              Couleurs, formes et logo. Le lien reste identique, le code imprimé aussi.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            onClick={handleSaveDesign}
+            disabled={savingDesign}
+          >
+            {savingDesign ? <Spinner /> : <Icon name="check" size={14} />}
+            Enregistrer le design
+          </button>
+        </div>
+
+        {designNotice && (
+          <div className="mt-4">
+            <Alert variant={designNotice.variant} onClose={() => setDesignNotice(null)}>
+              {designNotice.text}
+            </Alert>
+          </div>
+        )}
+
+        <div className="mt-5">
+          <QrDesigner text={url} value={designDraft} onChange={setDesignDraft} />
         </div>
       </div>
 

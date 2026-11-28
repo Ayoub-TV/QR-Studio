@@ -1,0 +1,13 @@
+# Cloudflare Pages — QR Studio
+#
+# Dashboard values (Workers & Pages → qr-studio-dne → Settings → Build):
+#   Build command:      npm run build
+#   Build output:       dist
+#   Root directory:     /   (empty)
+#
+# `wrangler pages dev dist` runs the built frontend together with the Pages
+# Function in `functions/` (local runtime, same code as production).
+
+name = "qr-studio"
+compatibility_date = "2025-09-01"
+pages_build_output_dir = "dist"
