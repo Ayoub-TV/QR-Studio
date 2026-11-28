@@ -123,12 +123,7 @@ export default function Landing() {
         <div className="grid-pattern pointer-events-none absolute inset-0 opacity-60 [mask-image:radial-gradient(ellipse_at_top,black,transparent_72%)]" />
         <div className="relative mx-auto grid max-w-6xl gap-14 px-5 py-16 sm:px-8 lg:grid-cols-[1.05fr_1fr] lg:items-center lg:py-24">
           <div className="animate-fade-up">
-            <span className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-3 py-1 text-[11px] font-medium tracking-wide text-zinc-600">
-              <span className="h-1.5 w-1.5 rounded-full bg-accent" />
-              QR codes dynamiques · suivi des scans
-            </span>
-
-            <h1 className="mt-6 text-[40px] leading-[1.05] font-semibold tracking-[-0.04em] sm:text-[54px]">
+            <h1 className="text-[40px] leading-[1.05] font-semibold tracking-[-0.04em] sm:text-[54px]">
               Vos QR codes imprimés ne seront plus jamais obsolètes.
             </h1>
 

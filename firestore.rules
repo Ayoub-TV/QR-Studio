@@ -3,7 +3,8 @@ rules_version = '2';
 // QR Studio — règles Firestore de production.
 //
 // Modèle : chaque document appartient à un seul utilisateur (`ownerId`).
-// - Le client ne peut lire/écrire que ses propres QR codes.
+// - Le client ne peut lire/écrire que ses propres QR codes, dont le design
+//   visuel (`design`), validé champ par champ.
 // - Les compteurs (totalScans, uniqueVisitors, lastScanAt) ne sont jamais
 //   modifiables par le client : seule la fonction Cloudflare Pages (compte de
 //   service, qui contourne ces règles) les incrémente.
@@ -41,6 +42,36 @@ service cloud.firestore {
         && (type == 'text' || value.matches('^https?://.+'));
     }
 
+    // --------------------------------------------------------------- design
+    // Visual customisation stored on the QR document. Validated here so a
+    // malicious client cannot store an SVG/HTML payload as the logo data URL
+    // or an arbitrary map that the renderer would have to defend against.
+    function validHex(value) {
+      return value is string && value.matches('^#[0-9a-fA-F]{6}$');
+    }
+
+    function validDesign(design) {
+      return design is map
+        && design.keys().hasAll(['bg', 'dots', 'eyes', 'fg', 'logo', 'logoScale'])
+        && design.keys().hasOnly(['bg', 'dots', 'eyes', 'fg', 'logo', 'logoScale'])
+        && validHex(design.fg)
+        && validHex(design.bg)
+        && design.dots in ['diamond', 'dots', 'rounded', 'square']
+        && design.eyes in ['circle', 'rounded', 'square']
+        && (design.logo == null
+            || (design.logo is string
+                && design.logo.size() <= 120000
+                && design.logo.matches('^data:image/')))
+        && design.logoScale is number
+        && design.logoScale >= 0.12
+        && design.logoScale <= 0.3;
+    }
+
+    // Older codes have no design, and a design may be added by a later update.
+    function designAllowed(data) {
+      return !data.keys().hasAny(['design']) || validDesign(data.design);
+    }
+
     // ---------------------------------------------------------------- users
     match /users/{uid} {
       allow read: if signedIn() && request.auth.uid == uid;
@@ -71,7 +102,7 @@ service cloud.firestore {
       // working even when the destination is edited later.
       allow create: if signedIn()
         && request.resource.data.keys().hasOnly([
-             'active', 'createdAt', 'destination', 'lastScanAt', 'name',
+             'active', 'createdAt', 'design', 'destination', 'lastScanAt', 'name',
              'ownerId', 'slug', 'totalScans', 'type', 'uniqueVisitors', 'updatedAt'
            ])
         && request.resource.data.ownerId == request.auth.uid
@@ -83,7 +114,8 @@ service cloud.firestore {
         && request.resource.data.totalScans == 0
         && request.resource.data.uniqueVisitors == 0
         && request.resource.data.lastScanAt == null
-        && request.resource.data.active == true;
+        && request.resource.data.active == true
+        && designAllowed(request.resource.data);
 
       allow update: if isOwner(resource.data)
         && request.resource.data.ownerId == resource.data.ownerId
@@ -93,10 +125,11 @@ service cloud.firestore {
         && request.resource.data.lastScanAt == resource.data.lastScanAt
         && request.resource.data.createdAt == resource.data.createdAt
         && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['name', 'destination', 'type', 'updatedAt', 'active'])
+             .hasOnly(['name', 'destination', 'type', 'updatedAt', 'active', 'design'])
         && validQrName(request.resource.data.name)
         && validQrType(request.resource.data.type)
-        && validDestination(request.resource.data.type, request.resource.data.destination);
+        && validDestination(request.resource.data.type, request.resource.data.destination)
+        && designAllowed(request.resource.data);
 
       allow delete: if isOwner(resource.data);
 
